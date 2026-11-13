@@ -1,0 +1,44 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String       @id @default(uuid())
+  username     String       @unique
+  displayName  String
+  bio          String?
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  letters      Letter[]
+}
+
+model Letter {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  senderName  String?
+  content     String
+  presetStyle String       @default("vintage")
+  isRead      Boolean      @default(false)
+  isFavorite  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  attachments Attachment[]
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  letterId  String
+  letter    Letter   @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  type      String
+  fileUrl   String
+  fileName  String
+  fileSize  Int
+  duration  Int?
+  createdAt DateTime @default(now())
+}
