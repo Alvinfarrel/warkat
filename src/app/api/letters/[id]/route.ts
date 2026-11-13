@@ -71,13 +71,17 @@ export async function DELETE(
       );
     }
 
-    // Attempt to remove attachments from disk
-    for (const att of letter.attachments) {
-      try {
-        const localPath = path.join(process.cwd(), "public", att.fileUrl);
-        await fs.unlink(localPath);
-      } catch {
-        // Ignore if already deleted
+    // Attempt to remove attachments from disk if running locally
+    if (!process.env.VERCEL) {
+      for (const att of letter.attachments) {
+        try {
+          if (!att.fileUrl.startsWith("http") && !att.fileUrl.startsWith("data:")) {
+            const localPath = path.join(process.cwd(), "public", att.fileUrl);
+            await fs.unlink(localPath);
+          }
+        } catch {
+          // Ignore if already deleted
+        }
       }
     }
 

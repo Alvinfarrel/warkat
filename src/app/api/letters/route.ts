@@ -78,11 +78,7 @@ export async function POST(req: Request) {
     }
 
     const hasVercelBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-
-    if (!hasVercelBlob) {
-      await fs.mkdir(uploadsDir, { recursive: true });
-    }
+    const isVercel = Boolean(process.env.VERCEL);
 
     const attachmentsData: Array<{
       type: "IMAGE" | "AUDIO";
@@ -114,15 +110,28 @@ export async function POST(req: Request) {
       const filename = `img_${crypto.randomUUID()}${ext}`;
       let finalFileUrl = "";
 
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
       if (hasVercelBlob) {
-        const blob = await put(`uploads/${filename}`, imageFile, {
-          access: "public",
-        });
-        finalFileUrl = blob.url;
+        try {
+          const blob = await put(`uploads/${filename}`, imageFile, {
+            access: "public",
+          });
+          finalFileUrl = blob.url;
+        } catch (blobErr) {
+          console.warn("Vercel blob put failed, falling back to data URL:", blobErr);
+          finalFileUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+        }
+      } else if (isVercel) {
+        // Fallback on Vercel without Blob token: store as base64 Data URL
+        finalFileUrl = `data:${mime};base64,${buffer.toString("base64")}`;
       } else {
+        // Local disk storage
+        const uploadsDir = path.join(process.cwd(), "public", "uploads");
+        await fs.mkdir(uploadsDir, { recursive: true });
         const filepath = path.join(uploadsDir, filename);
-        const arrayBuffer = await imageFile.arrayBuffer();
-        await fs.writeFile(filepath, Buffer.from(arrayBuffer));
+        await fs.writeFile(filepath, buffer);
         finalFileUrl = `/uploads/${filename}`;
       }
 
@@ -169,15 +178,27 @@ export async function POST(req: Request) {
       const filename = `audio_${crypto.randomUUID()}${ext}`;
       let finalAudioUrl = "";
 
+      const arrayBuffer = await audioFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
       if (hasVercelBlob) {
-        const blob = await put(`uploads/${filename}`, audioFile, {
-          access: "public",
-        });
-        finalAudioUrl = blob.url;
+        try {
+          const blob = await put(`uploads/${filename}`, audioFile, {
+            access: "public",
+          });
+          finalAudioUrl = blob.url;
+        } catch (blobErr) {
+          console.warn("Vercel blob put failed for audio, falling back to data URL:", blobErr);
+          finalAudioUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+        }
+      } else if (isVercel) {
+        // Fallback on Vercel without Blob token
+        finalAudioUrl = `data:${mime};base64,${buffer.toString("base64")}`;
       } else {
+        const uploadsDir = path.join(process.cwd(), "public", "uploads");
+        await fs.mkdir(uploadsDir, { recursive: true });
         const filepath = path.join(uploadsDir, filename);
-        const arrayBuffer = await audioFile.arrayBuffer();
-        await fs.writeFile(filepath, Buffer.from(arrayBuffer));
+        await fs.writeFile(filepath, buffer);
         finalAudioUrl = `/uploads/${filename}`;
       }
 
